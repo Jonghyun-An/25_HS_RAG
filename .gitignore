@@ -53,6 +53,3 @@ sample_records.json
 
 # Playwright screenshots
 .playwright-mcp/
-
-# uv lock file
-uv.lock
