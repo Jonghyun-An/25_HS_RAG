@@ -153,6 +153,23 @@ with st.sidebar:
     st.header("📊 시스템 정보")
     st.info("🔍 Pinecone 벡터 검색\n🤖 multilingual-e5-large 임베딩\n📚 104개 보험약관 청크")
     
+    # LangSmith 연동 상태 표시
+    if hasattr(st.session_state.rag_system, 'langsmith_enabled'):
+        if st.session_state.rag_system.langsmith_enabled:
+            st.success("🔍 LangSmith 추적 활성화됨")
+            st.caption(f"프로젝트: {st.session_state.rag_system.config.get('langsmith_project', 'insurance-rag-system')}")
+        else:
+            st.warning("⚠️ LangSmith 추적 비활성화됨")
+            st.caption("LANGSMITH_API_KEY 환경변수를 설정하세요")
+    
+    # LangChain 사용 여부 선택
+    if hasattr(st.session_state.rag_system, 'langsmith_enabled') and st.session_state.rag_system.langsmith_enabled:
+        st.session_state.use_langchain = st.checkbox(
+            "🔗 LangChain 사용", 
+            value=st.session_state.get('use_langchain', True),
+            help="LangChain을 사용하여 답변을 생성하고 LangSmith에서 추적합니다."
+        )
+    
     if st.button("🗑️ 채팅 기록 지우기"):
         st.session_state.messages = []
         st.rerun()
@@ -232,25 +249,31 @@ if submit_button and user_input.strip():
     # 답변 생성
     with st.spinner("🔍 보험 약관을 검색하고 답변을 생성하는 중..."):
         try:
-            result = st.session_state.rag_system.ask(user_input)
+            # LangChain 사용 여부 결정
+            use_langchain = st.session_state.get('use_langchain', True)
+            
+            result = st.session_state.rag_system.ask(user_input, use_langchain=use_langchain)
             
             # 디버그 모드용 검색 결과 저장
             if debug_mode:
                 st.session_state.last_search_results = result.get("sources", [])
                 st.session_state.last_query = user_input
                 st.session_state.last_answer_length = len(result["answer"])
+                st.session_state.last_langchain_used = result.get("langchain_used", False)
             
             # 봇 메시지 추가
             bot_message = {
                 "role": "assistant", 
                 "content": result["answer"],
-                "sources": result["sources"]
+                "sources": result["sources"],
+                "langchain_used": result.get("langchain_used", False)
             }
             st.session_state.messages.append(bot_message)
             
             # 디버그 정보 출력 (메인 화면에)
             if debug_mode:
-                st.success(f"✅ 답변 생성 완료: {len(result['sources'])}개 참고자료, {len(result['answer'])}자 답변")
+                langchain_status = "LangChain" if result.get("langchain_used", False) else "OpenAI API"
+                st.success(f"✅ 답변 생성 완료: {len(result['sources'])}개 참고자료, {len(result['answer'])}자 답변 ({langchain_status})")
             
         except Exception as e:
             st.error(f"❌ 오류가 발생했습니다: {e}")
@@ -312,6 +335,10 @@ if debug_mode:
         # 답변 생성 정보
         if hasattr(st.session_state, 'last_answer_length'):
             rag_info["마지막_답변_길이"] = f"{st.session_state.last_answer_length}자"
+        
+        # LangChain 사용 정보
+        if hasattr(st.session_state, 'last_langchain_used'):
+            rag_info["마지막_LangChain_사용"] = st.session_state.last_langchain_used
         
         # 네임스페이스 정보 (Pinecone)
         if 'rag_system' in st.session_state:

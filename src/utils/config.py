@@ -22,6 +22,12 @@ def get_config():
         "pinecone_api_key": os.getenv("PINECONE_API_KEY"),
         "pinecone_index_name": os.getenv("PINECONE_INDEX_NAME", "insurance-terms-rag"),
         
+        # LangSmith 설정
+        "langsmith_api_key": os.getenv("LANGSMITH_API_KEY"),
+        "langsmith_project": os.getenv("LANGSMITH_PROJECT", "insurance-rag-system"),
+        "langsmith_endpoint": os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com"),
+        "langsmith_tracing_v2": os.getenv("LANGSMITH_TRACING_V2", "true").lower() == "true",
+        
         # 디버그 설정
         "debug_mode": DEBUG_MODE,
         
@@ -46,3 +52,19 @@ def validate_config():
         raise ValueError(f"필수 환경 변수가 설정되지 않았습니다: {', '.join(missing_keys)}")
     
     return True
+
+def setup_langsmith():
+    """LangSmith 설정을 초기화합니다."""
+    config = get_config()
+    
+    if config.get("langsmith_api_key"):
+        os.environ["LANGCHAIN_API_KEY"] = config["langsmith_api_key"]
+        os.environ["LANGCHAIN_PROJECT"] = config["langsmith_project"]
+        os.environ["LANGCHAIN_ENDPOINT"] = config["langsmith_endpoint"]
+        os.environ["LANGCHAIN_TRACING_V2"] = str(config["langsmith_tracing_v2"])
+        
+        print(f"✅ LangSmith 설정 완료: 프로젝트 '{config['langsmith_project']}'")
+        return True
+    else:
+        print("⚠️ LangSmith API 키가 설정되지 않았습니다. LangSmith 추적이 비활성화됩니다.")
+        return False
